@@ -11,10 +11,12 @@
     canvas { position: absolute; top: 0; left: 0; }
     .toolbar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 5px; }
     #size-display { display: inline-block; border-radius: 50%; vertical-align: middle; margin-left: 5px; background-color: black; }
+    #back-btn { position: absolute; top: 10px; left: 10px; z-index: 20; padding: 5px 10px; font-size: 14px; }
   </style>
 </head>
 <body>
   <div id="home"></div>
+  <button id="back-btn" style="display:none;" onclick="goHome()">🏠 ホームに戻る</button>
   <div class="toolbar" id="toolbar" style="display:none;">
     <button onclick="prevPage()">◀ 前へ</button>
     <button onclick="nextPage()">次へ ▶</button>
@@ -42,17 +44,38 @@
 
     const home = document.getElementById('home');
     const toolbar = document.getElementById('toolbar');
+    const backBtn = document.getElementById('back-btn');
 
     const sizeSlider = document.getElementById('size-slider');
     const sizeDisplay = document.getElementById('size-display');
-    function updateSizeDisplay() { const size = sizeSlider.value; sizeDisplay.style.width = size + 'px'; sizeDisplay.style.height = size + 'px'; }
+
+    function updateSizeDisplay() {
+      const size = sizeSlider.value;
+      sizeDisplay.style.width = size + 'px';
+      sizeDisplay.style.height = size + 'px';
+      drawCtx.lineWidth = size; // 太さをリアルタイム反映
+    }
     updateSizeDisplay();
     sizeSlider.addEventListener('input', updateSizeDisplay);
 
-    document.getElementById('pen-btn').addEventListener('click', () => { penMode = true; eraserMode = false; drawCtx.globalCompositeOperation = 'source-over'; drawCtx.strokeStyle = penColor; drawCtx.lineWidth = sizeSlider.value; });
-    document.getElementById('eraser-btn').addEventListener('click', () => { penMode = false; eraserMode = true; drawCtx.globalCompositeOperation = 'destination-out'; drawCtx.lineWidth = sizeSlider.value; });
+    document.getElementById('pen-btn').addEventListener('click', () => {
+      penMode = true; eraserMode = false;
+      drawCtx.globalCompositeOperation = 'source-over';
+      drawCtx.strokeStyle = penColor;
+      drawCtx.lineWidth = sizeSlider.value;
+    });
+    document.getElementById('eraser-btn').addEventListener('click', () => {
+      penMode = false; eraserMode = true;
+      drawCtx.globalCompositeOperation = 'destination-out';
+      drawCtx.lineWidth = sizeSlider.value;
+    });
 
-    function resizeCanvases(width, height) { canvas.width = width; canvas.height = height; drawCanvas.width = width; drawCanvas.height = height; }
+    function resizeCanvases(width, height) {
+      canvas.width = width;
+      canvas.height = height;
+      drawCanvas.width = width;
+      drawCanvas.height = height;
+    }
 
     function renderPage(num) {
       if(!pdfDoc) return;
@@ -91,17 +114,13 @@
     window.addEventListener('resize', ()=>renderPage(pageNum));
 
     const textbooks = [
-      {
-        title: '数学',
-        url: 'https://raw.githubusercontent.com/Kousei0618/Digital-Text-Books-app/eedb7378697efb63afe56cf197053191a45cd291/tableofcontents.pdf'
-      }
+      { title: '数学', url: 'https://raw.githubusercontent.com/Kousei0618/Digital-Text-Books-app/eedb7378697efb63afe56cf197053191a45cd291/tableofcontents.pdf' }
     ];
 
-    // PDFの1ページ目を表紙として生成
     function createBookCoverFromPDF(book) {
       pdfjsLib.getDocument(book.url).promise.then(pdf => {
         pdf.getPage(1).then(page => {
-          const viewport = page.getViewport({scale: 0.5});
+          const viewport = page.getViewport({scale:0.5});
           const offCanvas = document.createElement('canvas');
           const offCtx = offCanvas.getContext('2d');
           offCanvas.width = viewport.width;
@@ -120,15 +139,15 @@
       div.style.backgroundImage = `url(${book.coverDataURL})`;
       div.title = book.title;
       div.onclick = () => {
+        history.pushState({page:'book'}, '', ''); // 履歴に追加
         home.style.display = 'none';
         container.style.display = 'block';
         toolbar.style.display = 'block';
+        backBtn.style.display = 'block';
         loadBookFromURL(book.url);
       };
       home.appendChild(div);
     }
-
-    const container = document.getElementById('container');
 
     function loadBookFromURL(url) {
       pdfjsLib.getDocument(url).promise.then(pdf => {
@@ -139,7 +158,17 @@
       }).catch(err => { console.error(err); alert('PDFを読み込めませんでした。'); });
     }
 
-    // 表紙作成
+    // ホームに戻る処理
+    function goHome() {
+      container.style.display = 'none';
+      toolbar.style.display = 'none';
+      backBtn.style.display = 'none';
+      home.style.display = 'flex';
+    }
+
+    // ブラウザの戻るボタン対応
+    window.addEventListener('popstate', (event) => { goHome(); });
+
     textbooks.forEach(book => createBookCoverFromPDF(book));
   </script>
 </body>
