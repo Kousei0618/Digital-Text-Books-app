@@ -9,7 +9,8 @@
     .book-cover { margin: 10px; width: 150px; height: 200px; background-size: cover; background-position: center; border: 2px solid #333; cursor: pointer; }
     #container { position: relative; width: 100vw; height: 100vh; display: none; }
     canvas { position: absolute; top: 0; left: 0; }
-    .toolbar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 5px; }
+    .toolbar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 5px; display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+    .color-btn { width:24px; height:24px; border:none; cursor:pointer; border-radius:3px; }
     #size-display { display: inline-block; border-radius: 50%; vertical-align: middle; margin-left: 5px; background-color: black; }
     #back-btn { position: absolute; top: 10px; left: 10px; z-index: 20; padding: 5px 10px; font-size: 14px; }
   </style>
@@ -23,6 +24,17 @@
     <span>ページ: <span id="page_num"></span> / <span id="page_count"></span></span>
     <button id="pen-btn">ペン</button>
     <button id="eraser-btn">消しゴム</button>
+    <!-- 色パレット -->
+    <span>色:
+      <button class="color-btn" style="background-color:#000000;"></button>
+      <button class="color-btn" style="background-color:#FF0000;"></button>
+      <button class="color-btn" style="background-color:#0000FF;"></button>
+      <button class="color-btn" style="background-color:#008000;"></button>
+      <button class="color-btn" style="background-color:#FFA500;"></button>
+      <button class="color-btn" style="background-color:#800080;"></button>
+      <button class="color-btn" style="background-color:#00FFFF;"></button>
+      <button class="color-btn" style="background-color:#FFC0CB;"></button>
+    </span>
     <label>太さ: <input type="range" id="size-slider" min="1" max="20" value="2"><span id="size-display"></span></label>
     <button onclick="clearDrawCanvas()">書き込み消去</button>
   </div>
@@ -53,11 +65,12 @@
       const size = sizeSlider.value;
       sizeDisplay.style.width = size + 'px';
       sizeDisplay.style.height = size + 'px';
-      drawCtx.lineWidth = size; // 太さをリアルタイム反映
+      drawCtx.lineWidth = size;
     }
     updateSizeDisplay();
     sizeSlider.addEventListener('input', updateSizeDisplay);
 
+    // ペン・消しゴム切替
     document.getElementById('pen-btn').addEventListener('click', () => {
       penMode = true; eraserMode = false;
       drawCtx.globalCompositeOperation = 'source-over';
@@ -68,6 +81,18 @@
       penMode = false; eraserMode = true;
       drawCtx.globalCompositeOperation = 'destination-out';
       drawCtx.lineWidth = sizeSlider.value;
+    });
+
+    // カラーパレット選択
+    document.querySelectorAll('.color-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        penColor = btn.style.backgroundColor;
+        penMode = true;
+        eraserMode = false;
+        drawCtx.globalCompositeOperation = 'source-over';
+        drawCtx.strokeStyle = penColor;
+        drawCtx.lineWidth = sizeSlider.value;
+      });
     });
 
     function resizeCanvases(width, height) {
@@ -139,10 +164,10 @@
       div.style.backgroundImage = `url(${book.coverDataURL})`;
       div.title = book.title;
       div.onclick = () => {
-        history.pushState({page:'book'}, '', ''); // 履歴に追加
+        history.pushState({page:'book'}, '', '');
         home.style.display = 'none';
         container.style.display = 'block';
-        toolbar.style.display = 'block';
+        toolbar.style.display = 'flex';
         backBtn.style.display = 'block';
         loadBookFromURL(book.url);
       };
@@ -158,7 +183,6 @@
       }).catch(err => { console.error(err); alert('PDFを読み込めませんでした。'); });
     }
 
-    // ホームに戻る処理
     function goHome() {
       container.style.display = 'none';
       toolbar.style.display = 'none';
@@ -166,7 +190,6 @@
       home.style.display = 'flex';
     }
 
-    // ブラウザの戻るボタン対応
     window.addEventListener('popstate', (event) => { goHome(); });
 
     textbooks.forEach(book => createBookCoverFromPDF(book));
