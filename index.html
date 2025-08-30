@@ -93,15 +93,31 @@
     const textbooks = [
       {
         title: '数学',
-        cover: 'math_cover.jpg',
         url: 'https://raw.githubusercontent.com/Kousei0618/Digital-Text-Books-app/eedb7378697efb63afe56cf197053191a45cd291/tableofcontents.pdf'
       }
     ];
 
-    textbooks.forEach(book => {
+    // PDFの1ページ目を表紙として生成
+    function createBookCoverFromPDF(book) {
+      pdfjsLib.getDocument(book.url).promise.then(pdf => {
+        pdf.getPage(1).then(page => {
+          const viewport = page.getViewport({scale: 0.5});
+          const offCanvas = document.createElement('canvas');
+          const offCtx = offCanvas.getContext('2d');
+          offCanvas.width = viewport.width;
+          offCanvas.height = viewport.height;
+          page.render({canvasContext: offCtx, viewport: viewport}).promise.then(() => {
+            book.coverDataURL = offCanvas.toDataURL();
+            addBookCoverToHome(book);
+          });
+        });
+      }).catch(err => { console.error(err); alert('PDFの表紙を生成できませんでした。'); });
+    }
+
+    function addBookCoverToHome(book) {
       const div = document.createElement('div');
       div.className = 'book-cover';
-      div.style.backgroundImage = `url(${book.cover})`;
+      div.style.backgroundImage = `url(${book.coverDataURL})`;
       div.title = book.title;
       div.onclick = () => {
         home.style.display = 'none';
@@ -110,7 +126,7 @@
         loadBookFromURL(book.url);
       };
       home.appendChild(div);
-    });
+    }
 
     const container = document.getElementById('container');
 
@@ -120,12 +136,11 @@
         document.getElementById('page_count').textContent = pdf.numPages;
         pageNum = 1;
         renderPage(pageNum);
-      }).catch(err => {
-        console.error(err);
-        alert('PDFを読み込めませんでした。');
-      });
+      }).catch(err => { console.error(err); alert('PDFを読み込めませんでした。'); });
     }
+
+    // 表紙作成
+    textbooks.forEach(book => createBookCoverFromPDF(book));
   </script>
 </body>
 </html>
-
