@@ -1,10 +1,131 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <title>PDF Handwriting Demo</title>
+  <meta charset="UTF-8">
+  <title>PDF教科書＋手書き試作品</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+    #home { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; width: 100vw; height: 100vh; background: #f0f0f0; }
+    .book-cover { margin: 10px; width: 150px; height: 200px; background-size: cover; background-position: center; border: 2px solid #333; cursor: pointer; }
+    #container { position: relative; width: 100vw; height: 100vh; display: none; }
+    canvas { position: absolute; top: 0; left: 0; }
+    .toolbar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 5px; }
+    #size-display { display: inline-block; border-radius: 50%; vertical-align: middle; margin-left: 5px; background-color: black; }
+  </style>
 </head>
 <body>
-  <h1>Hello GitHub Pages!</h1>
+  <div id="home"></div>
+  <div class="toolbar" id="toolbar" style="display:none;">
+    <button onclick="prevPage()">◀ 前へ</button>
+    <button onclick="nextPage()">次へ ▶</button>
+    <span>ページ: <span id="page_num"></span> / <span id="page_count"></span></span>
+    <button id="pen-btn">ペン</button>
+    <button id="eraser-btn">消しゴム</button>
+    <label>太さ: <input type="range" id="size-slider" min="1" max="20" value="2"><span id="size-display"></span></label>
+    <button onclick="clearDrawCanvas()">書き込み消去</button>
+  </div>
+  <div id="container">
+    <canvas id="pdf-canvas"></canvas>
+    <canvas id="draw-canvas"></canvas>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.worker.min.js";
+
+    let pdfDoc = null, pageNum = 1;
+    const canvas = document.getElementById('pdf-canvas');
+    const ctx = canvas.getContext('2d');
+    const drawCanvas = document.getElementById('draw-canvas');
+    const drawCtx = drawCanvas.getContext('2d');
+    let drawing = false, penMode = true, eraserMode = false, drawings = {}, penColor = '#000000';
+
+    const home = document.getElementById('home');
+    const toolbar = document.getElementById('toolbar');
+
+    const sizeSlider = document.getElementById('size-slider');
+    const sizeDisplay = document.getElementById('size-display');
+    function updateSizeDisplay() { const size = sizeSlider.value; sizeDisplay.style.width = size + 'px'; sizeDisplay.style.height = size + 'px'; }
+    updateSizeDisplay();
+    sizeSlider.addEventListener('input', updateSizeDisplay);
+
+    document.getElementById('pen-btn').addEventListener('click', () => { penMode = true; eraserMode = false; drawCtx.globalCompositeOperation = 'source-over'; drawCtx.strokeStyle = penColor; drawCtx.lineWidth = sizeSlider.value; });
+    document.getElementById('eraser-btn').addEventListener('click', () => { penMode = false; eraserMode = true; drawCtx.globalCompositeOperation = 'destination-out'; drawCtx.lineWidth = sizeSlider.value; });
+
+    function resizeCanvases(width, height) { canvas.width = width; canvas.height = height; drawCanvas.width = width; drawCanvas.height = height; }
+
+    function renderPage(num) {
+      if(!pdfDoc) return;
+      pdfDoc.getPage(num).then(page => {
+        const containerWidth = window.innerWidth;
+        const containerHeight = window.innerHeight;
+        const viewport = page.getViewport({scale:1});
+        const scaleFactor = Math.min(containerWidth / viewport.width, containerHeight / viewport.height);
+        const scaledViewport = page.getViewport({scale: scaleFactor});
+        resizeCanvases(scaledViewport.width, scaledViewport.height);
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        page.render({canvasContext: ctx, viewport: scaledViewport});
+        drawCtx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+        if(drawings[num]) drawCtx.putImageData(drawings[num],0,0);
+        document.getElementById('page_num').textContent = num;
+      });
+    }
+
+    function prevPage() { if(pageNum<=1) return; saveDrawings(); pageNum--; renderPage(pageNum); }
+    function nextPage() { if(!pdfDoc || pageNum>=pdfDoc.numPages) return; saveDrawings(); pageNum++; renderPage(pageNum); }
+
+    function startDraw(x,y){drawing=true;drawCtx.beginPath();drawCtx.moveTo(x,y);}
+    function drawMove(x,y){if(drawing){drawCtx.lineTo(x,y);drawCtx.stroke();}}
+    function endDraw(){drawing=false;}
+    function saveDrawings(){drawings[pageNum]=drawCtx.getImageData(0,0,drawCanvas.width,drawCanvas.height);}
+    function clearDrawCanvas(){drawCtx.clearRect(0,0,drawCanvas.width,drawCanvas.height); saveDrawings();}
+
+    drawCanvas.addEventListener('mousedown', e=>startDraw(e.offsetX,e.offsetY));
+    drawCanvas.addEventListener('mousemove', e=>drawMove(e.offsetX,e.offsetY));
+    drawCanvas.addEventListener('mouseup', endDraw);
+    drawCanvas.addEventListener('mouseout', endDraw);
+    drawCanvas.addEventListener('touchstart', e=>{if(e.touches.length===1){let rect=drawCanvas.getBoundingClientRect();let t=e.touches[0]; startDraw(t.clientX-rect.left, t.clientY-rect.top);}});
+    drawCanvas.addEventListener('touchmove', e=>{if(e.touches.length===1){let rect=drawCanvas.getBoundingClientRect();let t=e.touches[0]; drawMove(t.clientX-rect.left,t.clientY-rect.top);}});
+    drawCanvas.addEventListener('touchend', endDraw);
+
+    window.addEventListener('resize', ()=>renderPage(pageNum));
+
+    const textbooks = [
+      {
+        title: '数学',
+        cover: 'math_cover.jpg',
+        url: 'https://raw.githubusercontent.com/Kousei0618/Digital-Text-Books-app/eedb7378697efb63afe56cf197053191a45cd291/tableofcontents.pdf'
+      }
+    ];
+
+    textbooks.forEach(book => {
+      const div = document.createElement('div');
+      div.className = 'book-cover';
+      div.style.backgroundImage = `url(${book.cover})`;
+      div.title = book.title;
+      div.onclick = () => {
+        home.style.display = 'none';
+        container.style.display = 'block';
+        toolbar.style.display = 'block';
+        loadBookFromURL(book.url);
+      };
+      home.appendChild(div);
+    });
+
+    const container = document.getElementById('container');
+
+    function loadBookFromURL(url) {
+      pdfjsLib.getDocument(url).promise.then(pdf => {
+        pdfDoc = pdf;
+        document.getElementById('page_count').textContent = pdf.numPages;
+        pageNum = 1;
+        renderPage(pageNum);
+      }).catch(err => {
+        console.error(err);
+        alert('PDFを読み込めませんでした。');
+      });
+    }
+  </script>
 </body>
 </html>
+
